@@ -1,13 +1,13 @@
 
 package cl.duoc.ms.identidad.services;
-
+import cl.duoc.ms.identidad.exception.CorreoDuplicadoException;
 import cl.duoc.ms.identidad.entity.Cuenta;
 import cl.duoc.ms.identidad.entity.Rol;
 import cl.duoc.ms.identidad.repository.CuentaRepository;
 import cl.duoc.ms.identidad.repository.RolRepository;
 
 import java.util.Locale;
-
+import cl.duoc.ms.identidad.exception.CredencialesInvalidasException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -76,7 +76,9 @@ public class AuthService {
 
         // Verifica que el correo no esté registrado.
         if (existeCorreo(correo)) {
-            throw new IllegalArgumentException("El correo ya está registrado");
+            throw new CorreoDuplicadoException(
+                "El correo electrónico ya está registrado"
+            );
         }
 
         // Obtiene el rol que corresponde a los nuevos usuarios.
@@ -91,4 +93,43 @@ public class AuthService {
         // Guarda la cuenta en MySQL mediante el repositorio.
         return cuentaRepository.save(cuenta);
     }
+
+
+    /**
+     * Autentica a un usuario mediante su correo y contraseña.
+     *
+     * Comprueba que la cuenta exista, esté activa y que
+     * la contraseña coincida con el hash BCrypt almacenado.
+     *
+     * @param email Correo electrónico del usuario.
+     * @param password Contraseña ingresada por el usuario.
+     * @return Cuenta autenticada.
+     * @throws IllegalArgumentException si las credenciales son incorrectas.
+     * @throws IllegalStateException si la cuenta está desactivada.
+     */
+
+    public Cuenta autenticar(String email, String password) {
+
+        // Normaliza el correo antes de buscarlo.
+        String correo = email.trim().toLowerCase(Locale.ROOT);
+
+        // Busca la cuenta en MySQL.
+        Cuenta cuenta = cuentaRepository.findByEmail(correo)
+                .orElseThrow(() ->
+                        new CredencialesInvalidasException("Credenciales incorrectas")
+                );
+
+        // Verifica la contraseña contra el hash BCrypt almacenado.
+        if (!passwordEncoder.matches(password, cuenta.getPasswordHash())) {
+            throw new CredencialesInvalidasException("Credenciales incorrectas");
+        }
+
+        // Impide el acceso a cuentas desactivadas.
+        if (!Boolean.TRUE.equals(cuenta.getActivo())) {
+            throw new IllegalStateException("La cuenta está desactivada");
+        }
+
+        return cuenta;
+    }
+
 }
