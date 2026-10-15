@@ -1,5 +1,8 @@
 package cl.duoc.ms.identidad.dto;
 
-public class AuthResponse {
+public record AuthResponse (
+    String token,
+    String tipoToken
+){
 
 }

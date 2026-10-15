@@ -8,6 +8,14 @@ import cl.duoc.ms.identidad.services.AuthService;
 
 import jakarta.validation.Valid;
 
+
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import cl.duoc.ms.identidad.dto.LoginRequest;
+import cl.duoc.ms.identidad.dto.AuthResponse;
+import cl.duoc.ms.identidad.services.JwtService;
+
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +28,9 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+
+    @Autowired
+    private JwtService jwtService;
     /**
      * Recibe los datos de registro, valida la solicitud
      * y delega la creación de la cuenta al servicio.
@@ -50,4 +61,60 @@ public class AuthController {
                 .status(HttpStatus.CREATED)
                 .body(respuesta);
     }
+
+    /**
+         * Autentica al usuario y genera un token JWT.
+         *
+         * @param request Correo y contraseña enviados por el cliente.
+         * @return Token JWT y tipo de autenticación HTTP 200.
+         */
+        @PostMapping("/login")
+        public ResponseEntity<AuthResponse> login(
+                @Valid @RequestBody LoginRequest request) {
+
+        // Comprueba las credenciales y obtiene la cuenta autenticada.
+        Cuenta cuenta = authService.autenticar(
+                request.email(),
+                request.password()
+        );
+
+        // Genera un JWT firmado con los datos de la cuenta.
+        String token = jwtService.generarToken(
+                cuenta.getIdCuenta(),
+                cuenta.getEmail(),
+                cuenta.getRol().getNombre()
+        );
+
+        // Construye la respuesta que recibirá el cliente.
+        AuthResponse respuesta = new AuthResponse(token, "Bearer");
+
+        return ResponseEntity.ok(respuesta);
+        }
+
+        /**
+         * Obtiene la identidad del usuario autenticado mediante JWT.
+         *
+         * Spring Security valida el token antes de permitir
+         * la ejecución de este método.
+         *
+         * @param autenticacion Información del JWT validado.
+         * @return Identidad pública del usuario autenticado.
+         */
+        @GetMapping("/me")
+        public ResponseEntity<Map<String, Object>> obtenerMiPerfil(
+                JwtAuthenticationToken autenticacion) {
+
+        // Recupera los datos del JWT previamente validado.
+        String correo = autenticacion.getToken().getSubject();
+        Integer idCuenta = ((Number) autenticacion.getToken()
+                .getClaim("idCuenta")).intValue();
+        String rol = autenticacion.getToken().getClaimAsString("rol");
+
+        // Devuelve únicamente información no sensible.
+        return ResponseEntity.ok(Map.of(
+                "idCuenta", idCuenta,
+                "email", correo,
+                "rol", rol
+        ));
+        }
 }

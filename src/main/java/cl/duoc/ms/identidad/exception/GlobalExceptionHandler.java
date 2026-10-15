@@ -2,8 +2,11 @@
 package cl.duoc.ms.identidad.exception;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,9 +18,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *
  * Permite entregar respuestas HTTP consistentes sin
  * exponer información técnica o sensible al cliente.
+ *
+ * Los errores inesperados se registran en la consola
+ * para facilitar su diagnóstico.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * Registrador centralizado de errores del servidor.
+     */
+    private static final Logger log =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * Maneja errores de validación de los DTO.
@@ -29,7 +41,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> manejarValidacion(
             MethodArgumentNotValidException ex) {
 
-        Map<String, String> errores = new java.util.LinkedHashMap<>();
+        Map<String, String> errores = new LinkedHashMap<>();
 
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 errores.putIfAbsent(
@@ -48,8 +60,6 @@ public class GlobalExceptionHandler {
         ));
     }
 
-
-
     /**
      * Maneja los intentos de registro con un correo ya existente.
      *
@@ -66,9 +76,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-
-
-
     /**
      * Maneja los intentos de autenticación con credenciales incorrectas.
      *
@@ -84,8 +91,6 @@ public class GlobalExceptionHandler {
                 "Credenciales incorrectas"
         );
     }
-
-
 
     /**
      * Maneja errores de argumentos utilizados por los servicios.
@@ -104,7 +109,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Maneja errores inesperados sin revelar información interna.
+     * Maneja errores inesperados y registra su causa técnica.
+     *
+     * La excepción completa se registra en el servidor,
+     * pero no se expone al cliente.
      *
      * @param ex Excepción no controlada.
      * @return Respuesta HTTP 500.
@@ -113,6 +121,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> manejarErrorInesperado(
             Exception ex) {
 
+        // Registra la excepción y su traza para facilitar el diagnóstico.
+        log.error("Error inesperado al procesar la solicitud", ex);
+
+        // Devuelve una respuesta segura sin detalles internos.
         return crearRespuesta(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Ocurrió un error interno del servidor"

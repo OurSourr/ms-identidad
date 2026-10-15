@@ -48,12 +48,18 @@ public class SecurityConfig {
                 // Cualquier visitante puede registrarse.
                 .requestMatchers(
                     HttpMethod.POST,
-                    "/api/auth/registro"
+                    "/api/auth/registro",
+                    "/api/auth/login"
                 ).permitAll()
 
                 // Las demás rutas requieren autenticación.
                 .anyRequest().authenticated()
-            );
+            )
+
+            // Valida automaticamente los JWT enviados como baerer token.
+             .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt ->{})
+             );
 
         return http.build();
     }
