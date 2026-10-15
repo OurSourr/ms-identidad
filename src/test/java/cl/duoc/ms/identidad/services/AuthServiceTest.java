@@ -197,4 +197,32 @@ class AuthServiceTest {
                 && cuenta.getRol() == rolCliente
         ));
     }
+
+    /**
+ * Comprueba que el registro falle si el rol
+ * ROLE_CLIENTE no existe en la base de datos.
+ */
+    @Test
+    void rechazarRegistroSinRolCliente() {
+
+        when(cuentaRepository.existsByEmail("nuevo@oursour.cl"))
+                .thenReturn(false);
+
+        when(rolRepository.findByNombre("ROLE_CLIENTE"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> authService.registrar(
+                        "nuevo@oursour.cl",
+                        "Password123!"
+                )
+        );
+
+        // No debe guardar una cuenta sin rol.
+        verify(cuentaRepository, never()).save(any(Cuenta.class));
+
+        // No debe generar el hash si falta el rol.
+        verifyNoInteractions(passwordEncoder);
+    }
 }
