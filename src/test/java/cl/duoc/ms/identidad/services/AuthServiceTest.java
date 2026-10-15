@@ -1,6 +1,8 @@
 package cl.duoc.ms.identidad.services;
 
 import cl.duoc.ms.identidad.entity.Cuenta;
+import cl.duoc.ms.identidad.entity.Rol;
+import cl.duoc.ms.identidad.exception.CorreoDuplicadoException;
 import cl.duoc.ms.identidad.exception.CredencialesInvalidasException;
 import cl.duoc.ms.identidad.repository.CuentaRepository;
 import cl.duoc.ms.identidad.repository.RolRepository;
@@ -15,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /**
@@ -132,5 +136,65 @@ class AuthServiceTest {
                         "Password123!"
                 )
         );
+    }
+
+    /**
+ * Comprueba que no se pueda registrar una cuenta
+ * cuando el correo electrónico ya existe.
+ */
+    @Test
+    void rechazarRegistroConCorreoDuplicado() {
+
+        when(cuentaRepository.existsByEmail("cliente@oursour.cl"))
+                .thenReturn(true);
+
+        assertThrows(
+                CorreoDuplicadoException.class,
+                () -> authService.registrar(
+                        "CLIENTE@OURSOUR.CL",
+                        "Password123!"
+                )
+        );
+
+        verify(cuentaRepository, never()).save(any(Cuenta.class));
+    }
+
+        /**
+ * Comprueba que un nuevo usuario se registre correctamente,
+ * reciba el rol de cliente y tenga su contraseña protegida.
+ */
+    @Test
+    void registrarClienteCorrectamente() {
+
+        Rol rolCliente = mock(Rol.class);
+        Cuenta cuentaGuardada = mock(Cuenta.class);
+
+        when(cuentaRepository.existsByEmail("nuevo@oursour.cl"))
+                .thenReturn(false);
+
+        when(rolRepository.findByNombre("ROLE_CLIENTE"))
+                .thenReturn(Optional.of(rolCliente));
+
+        when(passwordEncoder.encode("Password123!"))
+                .thenReturn("hashSeguro");
+
+        when(cuentaRepository.save(any(Cuenta.class)))
+                .thenReturn(cuentaGuardada);
+
+        Cuenta resultado = authService.registrar(
+                "NUEVO@OURSOUR.CL",
+                "Password123!"
+        );
+
+        assertSame(cuentaGuardada, resultado);
+
+        verify(passwordEncoder).encode("Password123!");
+        verify(rolRepository).findByNombre("ROLE_CLIENTE");
+
+        verify(cuentaRepository).save(argThat(cuenta ->
+                cuenta.getEmail().equals("nuevo@oursour.cl")
+                && cuenta.getPasswordHash().equals("hashSeguro")
+                && cuenta.getRol() == rolCliente
+        ));
     }
 }
